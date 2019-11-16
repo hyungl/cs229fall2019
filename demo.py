@@ -74,6 +74,9 @@ def buildDataSet(dir):
     fileList = [f for f in os.listdir(dir) if os.path.splitext(f)[1] == '.wav']
     dataset = {}
     i=0
+    n_fft = 4096
+    hop_length = n_fft // 2
+
     for fileName in fileList:
         i += 1
         tmp = fileName.split('.')[0]
@@ -87,16 +90,26 @@ def buildDataSet(dir):
         # convert to mfcc
         feature = librosa.feature.mfcc(y=y, sr=sample_rate, n_mfcc=12)
 
-        if i < 40:
-            # save spectrographs
-            plt.figure(figsize=(10, 4))
+        if i < 1:   # this is set to higher number is want to generate plots
+            # save mfcc feature plot
+            plt.figure()
+            ax = plt.subplot(2, 1, 1)
+            plt.title('MFCC')
             librosa.display.specshow(feature, x_axis='time')
             plt.colorbar()
-            plt.title('MFCC')
+
+            # save spectrum
+            plt.subplot(2, 1, 2, sharex=ax)
+            plt.title('PCEN spectrum')
+            D = librosa.stft(y, n_fft=n_fft, hop_length=hop_length, center=False)
+            # Compute pcen on the magnitude spectrum.
+            # We don't need to worry about initial and final filter delays if
+            # we're doing everything in one go.
+            P = librosa.pcen(np.abs(D), sr=sample_rate, hop_length=hop_length)
+            # First, plot the spectrum
+            librosa.display.specshow(P, sr=sample_rate, hop_length=hop_length, x_axis='time', y_axis='log')
             plt.tight_layout()
-            # plt.show()
-            # print(label)
-            file_name = 'mfcc{}_{}.pdf'.format('_1' , label)
+            file_name = 'mfcc{}_spectrum_{}.pdf'.format('_', label)
             save_path = os.path.join('.', file_name)
             plt.savefig(save_path)
 
@@ -132,8 +145,16 @@ def train_GMMHMM(dataset):
         length = np.zeros([len(trainData), ], dtype=np.int)
         for m in range(len(trainData)):
             length[m] = trainData[m].shape[0]
-        # trainData = np.vstack(trainData)
+            print(length[m])
+            # print(m)
+
+            
+        # print(np.array(trainData[m])) # this has shape 12,44
+        # trainData = np.vstack(np.asarray(trainData))
+        print(np.asarray(trainData).shape)
+
         model.fit(trainData, lengths=length)  # get optimal parameters
+        # model.fit(trainData)
         GMMHMM_Models[label] = model
     return GMMHMM_Models
 
