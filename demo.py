@@ -14,6 +14,7 @@ from hmmlearn import hmm
 import numpy as np
 import librosa
 import librosa.display
+import csv
 
 ## currently unused libraries
 # from scipy.io import wavfile
@@ -73,12 +74,16 @@ def buildDataSet(dir):
     # Filter out the wav audio files under the dir
     fileList = [f for f in os.listdir(dir) if os.path.splitext(f)[1] == '.wav']
     dataset = {}
-    i=0
+    iteration=0
     n_fft = 4096
+    num_mfcc = 12
     hop_length = n_fft // 2
+    max_time_stamp = 44    #most files are 32k except noise which can be upto 3M
+    # max_time_stamp = 0
 
     for fileName in fileList:
-        i += 1
+        updated_feature_array = np.zeros((num_mfcc, max_time_stamp))
+        iteration += 1
         tmp = fileName.split('.')[0]
         label = tmp.split('_')[0]
         # print(label)
@@ -88,9 +93,39 @@ def buildDataSet(dir):
         # load wav file
         y,sample_rate = librosa.load(dir+fileName)
         # convert to mfcc
-        feature = librosa.feature.mfcc(y=y, sr=sample_rate, n_mfcc=12)
+        feature = librosa.feature.mfcc(y=y, sr=sample_rate, n_mfcc=num_mfcc)
+        # feature is a numpy array
+        # print(type(feature))
+        # print(feature.shape)
 
-        if i < 1:   # this is set to higher number is want to generate plots
+        time_stamp = feature.shape[1]
+        # print(feature.shape)
+        # print(updated_feature_array.shape)
+
+        # this is added since  time stamps vary between wav files
+        pad = 0
+
+        if time_stamp < max_time_stamp:
+            # current file is shorter than the max. duration, pad feature vector again for remaining time duration
+            for i in range(time_stamp):
+                updated_feature_array[:,i] = feature[:,i]
+            for j in range(max_time_stamp - time_stamp):
+                updated_time_stamp = time_stamp + j
+                updated_feature_array[:, updated_time_stamp] = feature[:,pad]
+                pad += 1
+                if pad == time_stamp:
+                    pad = 0
+                # print('Pad index is', pad)
+                # updated_feature_array[:, updated_time_stamp] = 0
+        else:
+            # current time is greater than max. duration, copy only portion of file upto max. time stamp ignore the rest
+            for i in range(max_time_stamp):
+                updated_feature_array[:,i] = feature[:,i]
+
+        if (iteration % 500 == 0):
+            print('i = ', iteration, 'feature shape = ', updated_feature_array.shape)
+
+        if i < 1:   # this is set to higher number is want to generate plots, set to 1 if want to skip plot
             # save mfcc feature plot
             plt.figure()
             ax = plt.subplot(2, 1, 1)
@@ -113,14 +148,17 @@ def buildDataSet(dir):
             save_path = os.path.join('.', file_name)
             plt.savefig(save_path)
 
+        del feature # to save memory
+
         if label_int not in dataset.keys():
             dataset[label_int] = []
-            dataset[label_int].append(feature)
+            dataset[label_int].append(updated_feature_array)
         else:
             exist_feature = dataset[label_int]
-            exist_feature.append(feature)
+            exist_feature.append(updated_feature_array)
             dataset[label_int] = exist_feature
 
+    # dataset[label_int] = np.array(dataset[label_int])
     return dataset
 
 def train_GMMHMM(dataset):
@@ -137,49 +175,33 @@ def train_GMMHMM(dataset):
                                [0, 0, 0, 0, 1]],dtype=np.float)
 
     # dim of startprobPrior is n_components
-    startprobPrior = np.array([0.5, 0.5, 0, 0, 0],dtype=np.float)
+    startprobPrior = np.array([0.3, 0.2, 0.1, 0.2, 0.2],dtype=np.float)
 
     for label in dataset.keys():
+
+        print('Label is ', label)
         model = hmm.GMMHMM(n_components=states_num, n_mix=GMM_mix_num, transmat_prior=transmatPrior, startprob_prior=startprobPrior, covariance_type='diag', n_iter=10)
         trainData = dataset[label]
-        length = np.zeros([len(trainData), ], dtype=np.int)
-        for m in range(len(trainData)):
-            length[m] = trainData[m].shape[0]
-            print(length[m])
-            # print(m)
 
-            
         # print(np.array(trainData[m])) # this has shape 12,44
-        # trainData = np.vstack(np.asarray(trainData))
-        print(np.asarray(trainData).shape)
 
-        model.fit(trainData, lengths=length)  # get optimal parameters
-        # model.fit(trainData)
+        trainData_array = np.asarray(trainData)
+        print('Original dimension is', trainData_array.shape)
+        trainData_array = np.dstack(np.asarray(trainData))
+        print('D stack dimension is', trainData_array.shape)
+
+        trainData_array = np.vstack(trainData_array)
+        print('V stack dimension is', trainData_array.shape)
+
+        trainData_array = np.transpose(trainData_array)
+        print('Final dimension is', trainData_array.shape)
+        length = ((trainData_array.shape[0],))
+
+
+        model.fit(trainData_array, lengths=length)  # get optimal parameters
         GMMHMM_Models[label] = model
+
     return GMMHMM_Models
-
-
-    # for label in dataset.keys():
-    #     model = hmm.GMMHMM(n_components=states_num, n_mix=GMM_mix_num, \
-    #                        transmat_prior=transmatPrior, startprob_prior=startprobPrior, \
-    #                        covariance_type='full', n_iter=10)
-    #
-    #     trainData_array = np.array(dataset[label])
-    #     num_obs = np.zeros([trainData_array.shape[0], 1], dtype=np.int)
-    #
-    #     for m in range(len(dataset[label])):    # this corresponds to # of observations
-    #         num_obs[m] = label
-    #
-    #     # num_obs.reshape(-1,1)
-    #     print('Shape of label is ', num_obs.shape)
-    #     print('Shape of data is', trainData_array.shape)
-    #     print('Label is ', num_obs)
-    #     print('Data is', trainData_array)
-    #
-    #     model.fit(trainData_array, lengths=num_obs)  # get optimal parameters
-    #     GMMHMM_Models[label] = model
-    # return GMMHMM_Models
-
 
 def main():
     dir = '/Users/amitapatil/Desktop/ACP/CS229_MachineLearning/Project/Dataset/speech_commands_v0.02'
@@ -267,43 +289,106 @@ def main():
     ## THIS PORTION OF CODE CAN BE COMMENTED OUT AFTER TRAIN/VALIDATION/TEST SETS ARE CREATED
 
     ## work with validation directory 1st to debug code since train set is too big
-    # trainDir = train_dirpath + '/'
-    # print(trainDir)
-    # trainDataSet = buildDataSet(trainDir)
-    # print("Finish preparing the training data")
-    # hmmModels = train_GMMHMM(trainDataSet)
-    # print("Finish training of the GMM_HMM models using train data")
+    trainDir = train_dirpath + '/'
+    trainDataSet = buildDataSet(trainDir)
+    # save trainDataset to csv file so dont have to rebuild the dataset
+    with open('trainDataSet.csv', 'w') as f:
+        for key in trainDataSet.keys():
+            f.write("%s,%s\n" % (key, trainDataSet[key]))
+    # # read csv file to dictionary
+    # reader = csv.reader(open('trainDataSet.csv', 'r'))
+    # trainDataSet = {}
+    # for row in reader:
+    #     label, v = row
+    #     trainDataSet[label] = v
+
+    print("Finished preparing the training data")
+    hmmModels = train_GMMHMM(trainDataSet)
+    print("Finished training of the GMM_HMM models using train data")
 
     validDir = validation_dirpath + '/'
     validDataSet = buildDataSet(validDir)
-    print("Finish preparing the validation data")
+    print("Finished preparing the validation data")
+    # save validDataset to csv file so dont have to rebuild the dataset
+    with open('validDataSet.csv', 'w') as f:
+        for key in validDataSet.keys():
+            f.write("%s,%s\n" % (key, validDataSet[key]))
+    # # read csv file to dictionary
+    # reader = csv.reader(open('validDataSet.csv', 'r'))
+    # validDataSet = {}
+    # for row in reader:
+    #     label, v = row
+    #     validDataSet[label] = v
 
-    hmmModels = train_GMMHMM(validDataSet)
-    print("Finish training of the GMM_HMM models using validation data")
-    #
-    # testDir = test_dirpath + '/'
-    # testDataSet = buildDataSet(testDir)
-    # print("Finish preparing the test data")
-    #
-    # # this codde is purely for debugging
-    # # label = 'backward'
-    # # label = 'bed'
-    # # label = ''
-    # # label_int = maplabel_to_int(label)
-    #
-    # score_cnt = 0
-    # for label in testDataSet.keys():
-    #     feature = testDataSet[label]
-    #     scoreList = {}
-    #     for model_label in hmmModels.keys():
-    #         model = hmmModels[model_label]
-    #         score = model.score(feature[0])
-    #         scoreList[model_label] = score
-    #     predict = max(scoreList, key=scoreList.get)
-    #     print("Test on true label ", label, ": predict result label is ", predict)
-    #     if predict == label:
-    #         score_cnt+=1
-    # print("Final recognition rate is %.2f"%(100.0*score_cnt/len(testDataSet.keys())), "%")
+    testDir = test_dirpath + '/'
+    testDataSet = buildDataSet(testDir)
+    print("Finished preparing the test data")
+    # save testDataset to csv file so dont have to rebuild the dataset
+    with open('testDataSet.csv', 'w') as f:
+        for key in testDataSet.keys():
+            f.write("%s,%s\n" % (key, testDataSet[key]))
+    # # read csv file to dictionary
+    # reader = csv.reader(open('testDataSet.csv', 'r'))
+    # testDataSet = {}
+    # for row in reader:
+    #     label, v = row
+    #     testDataSet[label] = v
+
+    score_cnt = 0
+    for label in testDataSet.keys():
+        testData = testDataSet[label]
+        # print(label)
+
+        # testData_array = np.asarray(testData)
+        testData_array = np.dstack(np.asarray(testData))
+        print('Original dimension of test array is', testData_array.shape)
+        testData_array = np.vstack(testData_array)
+        print('After vstack dimension of test array is', testData_array.shape)
+        testData_array = np.transpose(testData_array)
+        print('After transponse dimension of test array is', testData_array.shape)
+        length = ((testData_array.shape[0],))
+
+        scoreList = {}
+        for model_label in hmmModels.keys():
+            # print('Model Label is ', model_label)
+            model = hmmModels[model_label]
+            score = model.score(testData_array, lengths=length)
+            # print('score is ', score)
+            scoreList[model_label] = score
+            # print('score list is ', scoreList)
+
+        predict = max(scoreList, key=scoreList.get)
+        print("Test on true label ", label, ": predict result label is ", predict)
+        if predict == label:
+            score_cnt+=1
+    print("Final recognition rate on test set is %.2f"%(100.0*score_cnt/len(testDataSet.keys())), "%")
+
+    score_cnt = 0
+    for label in validDataSet.keys():
+        validData = validDataSet[label]
+
+        # validData_array = np.asarray(validData)
+        validData_array = np.dstack(np.asarray(validData))
+
+        validData_array = np.vstack(validData_array)
+
+        validData_array = np.transpose(validData_array)
+        length = ((validData_array.shape[0],))
+
+        scoreList = {}
+        for model_label in hmmModels.keys():
+            # print('Model Label is ', model_label)
+            model = hmmModels[model_label]
+            score = model.score(validData_array, lengths=length)
+            # print('score is ', score)
+            scoreList[model_label] = score
+            # print('score list is ', scoreList)
+
+        predict = max(scoreList, key=scoreList.get)
+        print("Test on true label ", label, ": predict result label is ", predict)
+        if predict == label:
+            score_cnt+=1
+    print("Final recognition rate on validation set is %.2f"%(100.0*score_cnt/len(testDataSet.keys())), "%")
 
 if __name__ == '__main__':
     main()

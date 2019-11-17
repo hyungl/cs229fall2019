@@ -7,6 +7,24 @@ Train set has 169700 wav files
 Validation set has 9981 wav files
 Test set has 11005 wav files
 
+Min. size of file that do not contain noise is 7k
+Max. size of file that do not contain noise is 32k
+Max. size of file that contain noise is 3M
+
+32kB files correspond to time series of length 44.
+Therefore we set our maximum time step to 44 and truncate noise files to up to this time stamp.
+
+
+Things to try:
+Hyperparameter tuning: # of mfcc components, # of components in HMM model, number of gaussians in GMM, currently noise is truncated
+instead if pad signal with zeros or append to wrap over from time0 would that improve model performance.
+Elaborate on error anayisis, add visualizations
+
+Other models to try: CNN, LSTM/RNN?
+
+Other ML techniques to try.
+Clustering, k fold validation
+
 
 
 
