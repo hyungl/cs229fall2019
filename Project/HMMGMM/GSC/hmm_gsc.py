@@ -125,7 +125,8 @@ def plot_confusion_matrix(cm, classes,normalize=True,title=None,cmap=plt.cm.Blue
     fig, ax = plt.subplots()
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
     ax.figure.colorbar(im, ax = ax)
-    ax.set(title=title,ylabel='True label',xlabel='Predicted label')
+    ax.set(title=title,xticklabels=classes, yticklabels=classes,
+           ylabel='True label',xlabel='Predicted label')
 
 
 def buildDataSet(dir):
@@ -152,186 +153,139 @@ def buildDataSet(dir):
         if label not in dataset.keys():
             dataset[label] = []
             dataset[label].append(feature)
-
         else:
             exist_feature = dataset[label]
             exist_feature.append(feature)
             dataset[label] = exist_feature
 
+    del feature
+    del exist_feature
     return dataset
 
 
 def train_GMMHMM(dataset):
     GMMHMM_Models = {}
-    states_num = 20
-    GMM_mix_num = 3
+    states_num = 100
+    GMM_mix_num = 9
     threshold = 0.00001
-    n_iterations = 20
+    n_iterations = 30
 
     transmatPrior = np.ones((states_num,states_num))/states_num
     startprobPrior = np.ones(states_num)/states_num
 
-
     for label in dataset.keys():
-
         print('Label is ', label)
-
         model = hmm.GMMHMM(n_components=states_num, n_mix=GMM_mix_num, \
                            transmat_prior=transmatPrior, startprob_prior=startprobPrior, \
                            covariance_type='diag', n_iter=n_iterations, tol=threshold, verbose=True)
-
         print('Convergence monitor for ' + str(label) + str(sys.stderr))
-
         trainData = dataset[label]  # this is list of 2D array
         trainData_array = np.transpose(np.concatenate(trainData,axis=1))
         length = ((trainData_array.shape[0],))
-
         model.fit(trainData_array, lengths=length)  # get optimal parameters
         GMMHMM_Models[label] = model
 
+
+
     return GMMHMM_Models
 
-def main():
-
-
-    dir = '/Users/amitapatil/Desktop/ACP/CS229_MachineLearning/Project/Dataset/speech_commands_v0.02'
-    alldir = os.listdir(dir)
-
-    # ## work with validation directory 1st to debug code since train set is too big
-    train_dirname = 'train_audio_subset'
-    train_dirpath = os.path.join(dir, train_dirname)
-    if not os.path.exists(train_dirpath):
-        os.makedirs(train_dirpath)
-    trainDir = train_dirpath + '/'
-    trainDataSet = buildDataSet(trainDir)
-
-    print("Finished preparing the training data")
-    hmmModels = train_GMMHMM(trainDataSet)
-    print("Finished training of the GMM_HMM models using train data")
-    # saving the model
-    with open("hmmgmm_model.pkl", "wb") as file: pickle.dump(hmmModels, file)
-
-
-    validation_dirname = 'valid_audio_subset'
-    validation_dirpath = os.path.join(dir,validation_dirname)
-    if not os.path.exists(validation_dirpath):
-        os.makedirs(validation_dirpath)
-
-    validDir = validation_dirpath + '/'
-    validDataSet = buildDataSet(validDir)
-    print("Finished preparing the validation data")
-
-    hmmModels = pickle.load(open("hmmgmm_model.pkl", "rb"))
-
-
-    # this is checking how well prediction matches the label on train set
+def predict_GMMHMM(dataset, hmmModels, type = 'train'):
+    # this is checking how well prediction matches the label on data set
     num_files = 0
     score_cnt = 0
-
-    y_train = []
+    y = []
     y_pred = []
-
     class_names = []
-
-    for label in trainDataSet.keys():
-
+    for label in dataset.keys():
         class_names.append(label)
-
-        trainData = trainDataSet[label]
-
-        for i in range(len(trainData)):
+        Data = dataset[label]
+        for i in range(len(Data)):
             num_files += 1
-
-            data_array = np.transpose(trainData[i])
+            data_array = np.transpose(Data[i])
             length = ((data_array.shape[0],))
-            # print(data_array.shape)
-
             scoreList = {}
-
             for model_label in hmmModels.keys():
-
                 model = hmmModels[model_label]
-
                 score = model.score(data_array, lengths=length)
                 scoreList[model_label] = score
-
-
             predict = max(scoreList, key=scoreList.get)
-
             # print("Test on true label ", label, ": predict result label is ", predict)
             if predict == label:
                 score_cnt += 1
-
-            y_train.append(label)
+            y.append(label)
             y_pred.append(predict)
-    print("Final recognition rate on train set is", 100 * score_cnt / num_files)
-
-    #plot confusion matrix
-    y_train_array = np.array(y_train)
+    print("Final recognition rate on ", type, ' set is', 100 * score_cnt / num_files)
+    # plot confusion matrix
+    y_array = np.array(y)
     y_pred_array = np.array(y_pred)
     np.set_printoptions(precision=2)
     # Compute confusion matrix
-    cnf_matrix = confusion_matrix(y_train_array, y_pred_array)
+    cnf_matrix = confusion_matrix(y_array, y_pred_array)
     # Plot normalized confusion matrix
     plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=True, title='Normalized Confusion Matrix')
-    plot_name = 'ConfusionMatrix_Normalized_TrainSet.pdf'
+    plot_name = 'ConfusionMatrix_Normalized_' + type + 'Set.pdf'
     plt.savefig(os.path.join('.', plot_name))
+    # Done checking how well prediction matches the label on data set
 
-    # Done checking how well prediction matches the label on train set
+    return
 
-    num_files = 0
-    score_cnt = 0
+def main():
+    dir = '/Users/amitapatil/Desktop/ACP/CS229_MachineLearning/Project/Dataset/speech_commands_v0.02_subsets'
 
-    y_valid = []
-    y_pred = []
+    ## load training/validation/test data (these are directories containing wav files)
+    # train_dirname = 'train_audio_3_words'
+    # validation_dirname = 'valid_audio_3_words'
+    # test_dirname = 'test_audio_3_words'
 
-    class_names = []
+    # train_dirname = 'train_audio_5_words'
+    # validation_dirname = 'valid_audio_5_words'
+    # test_dirname = 'test_audio_5_words'
 
-    for label in validDataSet.keys():
-        # print(label)
-        class_names.append(label)
+    train_dirname = 'train_audio_10_words'
+    validation_dirname = 'valid_audio_10_words'
+    test_dirname = 'test_audio_10_words'
 
-        validData = validDataSet[label]
+    ## convert wav files to MFCC based features
+    # training data
+    train_dirpath = os.path.join(dir, train_dirname)
+    trainDir = train_dirpath + '/'
+    # validation data
+    validation_dirpath = os.path.join(dir, validation_dirname)
+    validDir = validation_dirpath + '/'
+    # test data
+    test_dirpath = os.path.join(dir, test_dirname)
+    testDir = test_dirpath + '/'
 
-        for i in range(len(validData)):
-            num_files += 1
+    trainDataSet = buildDataSet(trainDir)
+    print("Finished preparing the training data")
+    validDataSet = buildDataSet(validDir)
+    print("Finished preparing the validation data")
+    testDataSet = buildDataSet(testDir)
+    print("Finished preparing the test data")
 
-            data_array = np.transpose(validData[i])
-            length = ((data_array.shape[0],))
-            # print(data_array.shape)
+    # Fit HMMGMM model using training data
+    hmmModels = train_GMMHMM(trainDataSet)
+    print("Finished training of the GMM_HMM models using train data")
+    # save the model
+    with open("hmmgmm_model.pkl", "wb") as file: pickle.dump(hmmModels, file)
 
-            scoreList = {}
+    # Load a saved model
+    hmmModels = pickle.load(open("hmmgmm_model.pkl", "rb"))
 
-            for model_label in hmmModels.keys():
+    # Predict labels using HMMGMM model
+    predict_GMMHMM(trainDataSet,hmmModels,type='train')
+    del trainDataSet
+    predict_GMMHMM(validDataSet,hmmModels,type='validation')
+    del validDataSet
+    predict_GMMHMM(testDataSet,hmmModels,type='test')
+    del testDataSet
 
-                model = hmmModels[model_label]
-
-                score = model.score(data_array, lengths=length)
-                scoreList[model_label] = score
-
-
-            predict = max(scoreList, key=scoreList.get)
-
-            print("Test on true label ", label, ": predict result label is ", predict)
-            if predict == label:
-                score_cnt += 1
-
-            y_valid.append(label)
-            y_pred.append(predict)
-    print("Final recognition rate on validation set is", 100*score_cnt/num_files)
-
-
-    #plot confusion matrix
-    y_valid_array = np.array(y_valid)
-    y_pred_array = np.array(y_pred)
-    # Compute confusion matrix
-    cnf_matrix = confusion_matrix(y_valid_array, y_pred_array)
-    # Plot normalized confusion matrix
-    plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=False, title='Normalized Confusion Matrix')
-    plot_name = 'ConfusionMatrix_Normalized_ValidationSet.pdf'
-    plt.savefig(os.path.join('.', plot_name))
-
-    # generatePlots(validDir)
+    # this creates MFCC and wave plots using all files in plotsDir
+    # plots_dirname = 'train_audio_super_subset_forPlots'
+    # plots_dirpath = os.path.join(dir, plots_dirname)
+    # plotsDir = plots_dirpath + '/'
+    # generatePlots(plotsDir)
 
 if __name__ == '__main__':
     main()
+
