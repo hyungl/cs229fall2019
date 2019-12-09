@@ -3,39 +3,46 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 from preprocess import *
+import sys
 
-X_train, X_test, y_train, y_test = get_train_test()
-print(X_train.shape)
-X_train = X_train.reshape(X_train.shape[0], 660)
-X_test = X_test.reshape(X_test.shape[0], 660)
+#https://www.geeksforgeeks.org/softmax-regression-using-tensorflow/
+
+DATA_PATH = sys.argv[1] if len(sys.argv) > 1 else "/Users/hyung.lee/cs229fall2019/speech_commands_tenlabels/"
+num_classes = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+n_mfcc = int(sys.argv[3]) if len(sys.argv) > 3 else 20
+
+x_train, x_validate, x_test, y_train, y_validate, y_test = get_train_test_valid(path=DATA_PATH)
+x_train = x_train.reshape(x_train.shape[0], n_mfcc)
+x_validate = x_validate.reshape(x_validate.shape[0], n_mfcc)
+x_test = x_test.reshape(x_test.shape[0], n_mfcc)
 y_train = y_train.reshape(y_train.shape[0], 1)
+y_validate = y_validate.reshape(y_validate.shape[0], 1)
 y_test = y_test.reshape(y_test.shape[0], 1)
 oneHot = OneHotEncoder(categories='auto')
 oneHot.fit(y_train)
 y = oneHot.transform(y_train).toarray()
+oneHot.fit(y_validate)
+y_validate = oneHot.transform(y_validate).toarray()
 oneHot.fit(y_test)
-y_t = oneHot.transform(y_test).toarray()
+y_test = oneHot.transform(y_test).toarray()
 # number of features
-num_features = 660
+num_features = n_mfcc
 # number of target labels
-num_labels = 35
+num_labels = int(sys.argv[2])
 # learning rate (alpha)
-learning_rate = 0.01
+learning_rate = 0.05
 # batch size
 batch_size = 128
 # number of epochs
-num_steps = 100001
+num_steps = 35001
 
 # input data
-train_dataset = X_train
-print(train_dataset.shape)
+train_dataset = x_train
 train_labels = y
-print(train_labels.shape)
-test_dataset = X_test
-print(test_dataset.shape)
-test_labels = y_t
-print(test_labels.shape)
-
+valid_dataset = x_validate
+valid_labels = y_validate
+test_dataset = x_test
+test_labels = y_test
 
 # initialize a tensorflow graph
 graph = tf.Graph()
@@ -48,6 +55,7 @@ with graph.as_default():
     # Inputs
     tf_train_dataset = tf.placeholder(tf.float32, shape=(batch_size, num_features))
     tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_labels))
+    tf_valid_dataset = tf.constant(valid_dataset)
     tf_test_dataset = tf.constant(test_dataset)
 
     # Variables.
@@ -64,6 +72,7 @@ with graph.as_default():
 
     # Predictions for the training, validation, and test data.
     train_prediction = tf.nn.softmax(logits)
+    valid_prediction = tf.nn.softmax(tf.matmul(tf_valid_dataset, weights) + biases)
     test_prediction = tf.nn.softmax(tf.matmul(tf_test_dataset, weights) + biases)
 
 
@@ -99,6 +108,8 @@ with tf.Session(graph=graph) as session:
             print("Minibatch loss at step {0}: {1}".format(step, l))
             print("Minibatch accuracy: {:.1f}%".format(
                 accuracy(predictions, batch_labels)))
+            print("Validation accuracy: {:.1f}%".format(
+                accuracy(valid_prediction.eval(), valid_labels)))
 
     print("\nTest accuracy: {:.1f}%".format(
         accuracy(test_prediction.eval(), test_labels)))
