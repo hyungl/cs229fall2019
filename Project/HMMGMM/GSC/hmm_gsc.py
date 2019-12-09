@@ -19,9 +19,11 @@ import pickle
 import scipy
 from scipy.io import wavfile
 
+from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.utils.multiclass import unique_labels
 import itertools
+import pylab as pl
 
 import sys
 
@@ -87,10 +89,10 @@ def generatePlots(dir):
 
     fileList = [f for f in os.listdir(dir) if os.path.splitext(f)[1] == '.wav']
 
-
     for fileName in fileList:
         tmp = fileName.split('.')[0]
         label = tmp.split('_')[0]
+        # print(label)
 
         y, sr = librosa.load(dir + fileName)
         D = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
@@ -122,11 +124,11 @@ def plot_confusion_matrix(cm, classes,normalize=True,title=None,cmap=plt.cm.Blue
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
 
+    classes = sorted(classes)
     fig, ax = plt.subplots()
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
     ax.figure.colorbar(im, ax = ax)
-    ax.set(title=title,xticklabels=classes, yticklabels=classes,
-           ylabel='True label',xlabel='Predicted label')
+    ax.set(title=title,ylabel='True label',xlabel='Predicted label')
 
 
 def buildDataSet(dir):
@@ -141,6 +143,7 @@ def buildDataSet(dir):
         # get label for the wav file
         tmp = fileName.split('.')[0]
         label = tmp.split('_')[0]
+        # print(label)
 
         # label_int = maplabel_to_int(label)
 
@@ -165,9 +168,9 @@ def buildDataSet(dir):
 
 def train_GMMHMM(dataset):
     GMMHMM_Models = {}
-    states_num = 100
+    states_num =  100
     GMM_mix_num = 9
-    threshold = 0.00001
+    threshold = 0.0001
     n_iterations = 30
 
     transmatPrior = np.ones((states_num,states_num))/states_num
@@ -198,6 +201,7 @@ def predict_GMMHMM(dataset, hmmModels, type = 'train'):
     class_names = []
     for label in dataset.keys():
         class_names.append(label)
+        # print(label)
         Data = dataset[label]
         for i in range(len(Data)):
             num_files += 1
@@ -209,7 +213,7 @@ def predict_GMMHMM(dataset, hmmModels, type = 'train'):
                 score = model.score(data_array, lengths=length)
                 scoreList[model_label] = score
             predict = max(scoreList, key=scoreList.get)
-            # print("Test on true label ", label, ": predict result label is ", predict)
+            print("Test on true label ", label, ": predict result label is ", predict)
             if predict == label:
                 score_cnt += 1
             y.append(label)
@@ -218,20 +222,25 @@ def predict_GMMHMM(dataset, hmmModels, type = 'train'):
     # plot confusion matrix
     y_array = np.array(y)
     y_pred_array = np.array(y_pred)
+    print(classification_report(y_array, y_pred_array, target_names=class_names))
     np.set_printoptions(precision=2)
     # Compute confusion matrix
     cnf_matrix = confusion_matrix(y_array, y_pred_array)
     # Plot normalized confusion matrix
+    # label_names = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
     plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=True, title='Normalized Confusion Matrix')
     plot_name = 'ConfusionMatrix_Normalized_' + type + 'Set.pdf'
     plt.savefig(os.path.join('.', plot_name))
     # Done checking how well prediction matches the label on data set
 
-    return
+
+
+
+
 
 def main():
-    dir = '/Users/amitapatil/Desktop/ACP/CS229_MachineLearning/Project/Dataset/speech_commands_v0.02_subsets'
-
+    dir = '/Users/amitapatil/Desktop/ACP/CS229_MachineLearning/Project/Dataset/speech_commands_v0.02_subsets/personalized'
+    # dir = '/Users/amitapatil/Desktop/ACP/CS229_MachineLearning/Project/Dataset/speech_commands_v0.02_subsets'
     ## load training/validation/test data (these are directories containing wav files)
     # train_dirname = 'train_audio_3_words'
     # validation_dirname = 'valid_audio_3_words'
@@ -241,51 +250,66 @@ def main():
     # validation_dirname = 'valid_audio_5_words'
     # test_dirname = 'test_audio_5_words'
 
-    train_dirname = 'train_audio_10_words'
-    validation_dirname = 'valid_audio_10_words'
-    test_dirname = 'test_audio_10_words'
+    # # this is non-numbers
+    # train_dirname = 'train_audio_10_words'
+    # validation_dirname = 'valid_audio_10_words'
+    # test_dirname = 'test_audio_10_words'
+
+    # # # this is numbers
+    # train_dirname = 'train_audio_10'
+    # validation_dirname = 'valid_audio_10'
+    # test_dirname = 'test_audio_10'
+
+    # # this is amita's voice on numbers
+    # train_dirname = 'train_numbers'
+    # validation_dirname = 'valid_numbers'
+
+
+    # # this is amita's voice on command words (not numbers)
+    # train_dirname = 'train_nonnumbers'
+    # validation_dirname = 'valid_nonnumbers'
 
     ## convert wav files to MFCC based features
     # training data
-    train_dirpath = os.path.join(dir, train_dirname)
-    trainDir = train_dirpath + '/'
+    # train_dirpath = os.path.join(dir, train_dirname)
+    # trainDir = train_dirpath + '/'
     # validation data
     validation_dirpath = os.path.join(dir, validation_dirname)
     validDir = validation_dirpath + '/'
-    # test data
-    test_dirpath = os.path.join(dir, test_dirname)
-    testDir = test_dirpath + '/'
+    # # test data
+    # test_dirpath = os.path.join(dir, test_dirname)
+    # testDir = test_dirpath + '/'
 
-    trainDataSet = buildDataSet(trainDir)
-    print("Finished preparing the training data")
+    # trainDataSet = buildDataSet(trainDir)
+    # print("Finished preparing the training data")
     validDataSet = buildDataSet(validDir)
     print("Finished preparing the validation data")
-    testDataSet = buildDataSet(testDir)
-    print("Finished preparing the test data")
+    # testDataSet = buildDataSet(testDir)
+    # print("Finished preparing the test data")
 
-    # Fit HMMGMM model using training data
-    hmmModels = train_GMMHMM(trainDataSet)
-    print("Finished training of the GMM_HMM models using train data")
-    # save the model
-    with open("hmmgmm_model.pkl", "wb") as file: pickle.dump(hmmModels, file)
+    # # Fit HMMGMM model using training data
+    # hmmModels = train_GMMHMM(trainDataSet)
+    # print("Finished training of the GMM_HMM models using train data")
+    # # save the model
+    # with open("hmmgmm_model.pkl", "wb") as file: pickle.dump(hmmModels, file)
 
     # Load a saved model
-    hmmModels = pickle.load(open("hmmgmm_model.pkl", "rb"))
+    hmmModels = pickle.load(open("hmmgmm_model_10_numbers.pkl", "rb"))
 
     # Predict labels using HMMGMM model
-    predict_GMMHMM(trainDataSet,hmmModels,type='train')
-    del trainDataSet
+    # predict_GMMHMM(trainDataSet,hmmModels,type='train')
+    # del trainDataSet
     predict_GMMHMM(validDataSet,hmmModels,type='validation')
     del validDataSet
-    predict_GMMHMM(testDataSet,hmmModels,type='test')
-    del testDataSet
+    # predict_GMMHMM(testDataSet,hmmModels,type='test')
+    # del testDataSet
 
-    # this creates MFCC and wave plots using all files in plotsDir
-    # plots_dirname = 'train_audio_super_subset_forPlots'
+    # # this creates MFCC and wave plots using all files in plotsDir
+    # # plots_dirname = 'train_audio_super_subset_forPlots'
+    # plots_dirname = 'valid_numbers'
     # plots_dirpath = os.path.join(dir, plots_dirname)
     # plotsDir = plots_dirpath + '/'
     # generatePlots(plotsDir)
 
 if __name__ == '__main__':
     main()
-
