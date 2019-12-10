@@ -38,7 +38,7 @@ def get_labels(path=DATA_PATH):
 def wav2mfcc(file_path, max_len=11):
     wave, sr = librosa.load(file_path, mono=True, sr=None)
     wave = np.array(wave[::3])
-    mfcc = librosa.feature.mfcc(wave, sr=sr, n_mfcc=40)
+    mfcc = librosa.feature.mfcc(wave, sr=sr, n_mfcc=20)
 
     # If maximum length exceeds mfcc lengths then pad the remaining ones
     if (max_len > mfcc.shape[1]):
@@ -49,8 +49,8 @@ def wav2mfcc(file_path, max_len=11):
     else:
         mfcc = mfcc[:, :max_len]
 
-    return np.sum(mfcc, axis=1)/11
-    #return mfcc
+    #return np.sum(mfcc, axis=1)/11
+    return mfcc
 
 def save_data_to_array(path=DATA_PATH, max_len=11):
     labels, _, _ = get_labels(path)
