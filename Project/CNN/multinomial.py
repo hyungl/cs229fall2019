@@ -4,8 +4,26 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 from preprocess import *
 import sys
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import os
 
 #https://www.geeksforgeeks.org/softmax-regression-using-tensorflow/
+
+def plot_confusion_matrix(cm, classes,normalize=True,title=None,cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    classes = sorted(classes)
+    fig, ax = plt.subplots()
+    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+    ax.figure.colorbar(im, ax = ax)
+    ax.set(title=title,ylabel='True label',xlabel='Predicted label')
 
 DATA_PATH = sys.argv[1] if len(sys.argv) > 1 else "/Users/hyung.lee/cs229fall2019/speech_commands_tenlabels/"
 num_classes = int(sys.argv[2]) if len(sys.argv) > 2 else 10
@@ -114,3 +132,8 @@ with tf.Session(graph=graph) as session:
     print("\nTest accuracy: {:.1f}%".format(
         accuracy(test_prediction.eval(), test_labels)))
 
+cnf_matrix = confusion_matrix(test_labels, test_prediction.eval())
+class_names = ['one','two','three','four','five','six','seven','eight','nine','zero']
+plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=True, title='Normalized Confusion Matrix')
+plot_name = 'ConfusionMatrix_Normalized_' + 'Test_' + 'Set_Multinomial.pdf'
+plt.savefig(os.path.join('.', plot_name))
