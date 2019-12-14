@@ -137,7 +137,7 @@ def buildDataSet(dir):
     # Filter out the wav audio files under the dir
     fileList = [f for f in os.listdir(dir) if os.path.splitext(f)[1] == '.wav']
     dataset = {}
-    num_mfcc = 13
+    num_mfcc = 6
 
     for fileName in fileList:
         # get label for the wav file
@@ -168,8 +168,8 @@ def buildDataSet(dir):
 
 def train_GMMHMM(dataset):
     GMMHMM_Models = {}
-    states_num =  100
-    GMM_mix_num = 9
+    states_num =  3
+    GMM_mix_num = 2
     threshold = 0.0001
     n_iterations = 30
 
@@ -213,7 +213,7 @@ def predict_GMMHMM(dataset, hmmModels, type = 'train'):
                 score = model.score(data_array, lengths=length)
                 scoreList[model_label] = score
             predict = max(scoreList, key=scoreList.get)
-            print("Test on true label ", label, ": predict result label is ", predict)
+            # print("Test on true label ", label, ": predict result label is ", predict)
             if predict == label:
                 score_cnt += 1
             y.append(label)
@@ -261,8 +261,8 @@ def main():
     # test_dirname = 'test_audio_10'
 
     # # this is amita's voice on numbers
-    # train_dirname = 'train_numbers'
-    # validation_dirname = 'valid_numbers'
+    train_dirname = 'train_numbers'
+    validation_dirname = 'valid_numbers'
 
 
     # # this is amita's voice on command words (not numbers)
@@ -271,8 +271,8 @@ def main():
 
     ## convert wav files to MFCC based features
     # training data
-    # train_dirpath = os.path.join(dir, train_dirname)
-    # trainDir = train_dirpath + '/'
+    train_dirpath = os.path.join(dir, train_dirname)
+    trainDir = train_dirpath + '/'
     # validation data
     validation_dirpath = os.path.join(dir, validation_dirname)
     validDir = validation_dirpath + '/'
@@ -280,8 +280,8 @@ def main():
     # test_dirpath = os.path.join(dir, test_dirname)
     # testDir = test_dirpath + '/'
 
-    # trainDataSet = buildDataSet(trainDir)
-    # print("Finished preparing the training data")
+    trainDataSet = buildDataSet(trainDir)
+    print("Finished preparing the training data")
     validDataSet = buildDataSet(validDir)
     print("Finished preparing the validation data")
     # testDataSet = buildDataSet(testDir)
@@ -294,11 +294,12 @@ def main():
     # with open("hmmgmm_model.pkl", "wb") as file: pickle.dump(hmmModels, file)
 
     # Load a saved model
-    hmmModels = pickle.load(open("hmmgmm_model_10_numbers.pkl", "rb"))
+    hmmModels = pickle.load(open("hmmgmm_model_10_numbers_acp.pkl", "rb"))
+    # hmmModels = pickle.load(open("hmmgmm_model_10_numbers.pkl", "rb"))
 
     # Predict labels using HMMGMM model
-    # predict_GMMHMM(trainDataSet,hmmModels,type='train')
-    # del trainDataSet
+    predict_GMMHMM(trainDataSet,hmmModels,type='train')
+    del trainDataSet
     predict_GMMHMM(validDataSet,hmmModels,type='validation')
     del validDataSet
     # predict_GMMHMM(testDataSet,hmmModels,type='test')
