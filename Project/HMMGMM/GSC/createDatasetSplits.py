@@ -1,7 +1,7 @@
 '''
+'''
 Created on 29/08/2018
-@author: wblgers
-https://github.com/wblgers/hmm_speech_recognition_demo/blob/master/demo.py
+@author: amita patil
 '''
 from __future__ import print_function
 import warnings
