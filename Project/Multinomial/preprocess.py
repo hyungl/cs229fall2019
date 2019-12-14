@@ -26,15 +26,11 @@ def get_labels(path=DATA_PATH):
         '_background_noise_',
         'cnnmodel.h5',
         'cnnmodel2.h5',
-        'cnnmodel3.h5',
-        'cat.npy',
-        'bed.npy',
-        'happy.npy']
+        'cnnmodel3.h5']
     for f in filesToRemove:
         if alldir.__contains__(f):
             alldir.remove(f)
     labels = alldir
-    labels = ['backward','cat','five','go','happy','learn','marvin','right','sheila','zero']#['zero','one','two','three','four','five','six','seven','eight','nine']#['five','follow','forward']#['backward','go','zero']#['go','no','wow'] #['bed','bird','backward']
     label_indices = np.arange(0, len(labels))
     return labels, label_indices, to_categorical(label_indices)
 
@@ -53,8 +49,7 @@ def wav2mfcc(file_path, max_len=11):
     else:
         mfcc = mfcc[:, :max_len]
 
-    #return np.sum(mfcc, axis=1)/11
-    return mfcc
+    return np.sum(mfcc, axis=1)/11
 
 def save_data_to_array(path=DATA_PATH, max_len=11):
     labels, _, _ = get_labels(path)
@@ -68,21 +63,20 @@ def save_data_to_array(path=DATA_PATH, max_len=11):
             mfcc = wav2mfcc(wavfile, max_len=max_len)
             mfcc_vectors.append(mfcc)
         print(mfcc_vectors[0].shape)
-        np.save(path + label + '.npy', mfcc_vectors)
+        np.save(label + '.npy', mfcc_vectors)
 
 
 def get_train_test_valid(split_ratio=0.6, random_state=42, path=DATA_PATH):
     # Get available labels
     labels, indices, _ = get_labels(path)
-    print(labels)
 
     # Getting first arrays
-    X = np.load(path + labels[0] + '.npy')
+    X = np.load('models/' + labels[0] + '.npy')
     y = np.zeros(X.shape[0])
 
     # Append all of the dataset into one single array, same goes for y
     for i, label in enumerate(labels[1:]):
-        x = np.load(path + label + '.npy')
+        x = np.load('models/' + label + '.npy')
         X = np.vstack((X, x))
         y = np.append(y, np.full(x.shape[0], fill_value=(i + 1)))
 
